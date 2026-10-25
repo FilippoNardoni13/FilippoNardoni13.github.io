@@ -24,6 +24,7 @@
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; }
     body {
+      isolation: isolate;
       margin: 0; background: var(--bg); color: var(--text);
       font-family: var(--serif); font-size: 18px; line-height: 1.6;
     }
@@ -34,7 +35,7 @@
     }
 
     /* ---------- Navigation ---------- */
-    nav { border-bottom: 1px solid var(--line); }
+    nav { background: var(--bg); border-bottom: 1px solid var(--line); }
     nav .wrap { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; flex-wrap: wrap; gap: 8px; }
     nav .name { font-weight: 700; color: var(--text); text-decoration: none; }
     nav ul { list-style: none; display: flex; gap: 20px; margin: 0; padding: 0; flex-wrap: wrap; }
@@ -46,30 +47,37 @@
 
     /* ---------- Header ---------- */
     header { padding: 52px 0 20px; display: flex; gap: 32px; align-items: center; flex-wrap: wrap; }
-    header img { width: 140px; height: 140px; border-radius: 50%; object-fit: cover; border: 1px solid var(--line); }
+    header img { flex: 0 0 auto; width: 190px; height: 190px; border-radius: 50%; object-fit: cover; border: 1px solid var(--line); }
+    header > div { flex: 1 1 300px; }
+    .location { color: var(--muted); margin: 6px 0 0; font-size: 1rem; }
     h1, h2, h3 { font-family: var(--serif); font-weight: 700; }
     h1 { font-size: 2.3rem; line-height: 1.15; margin: 0 0 6px; }
     .role { color: var(--muted); margin: 0; }
     .links { margin-top: 12px; display: flex; gap: 18px; flex-wrap: wrap; font-family: var(--mono); font-size: 0.8rem; }
 
-    /* ---------- Simulated series ---------- */
-    .ts { margin: 12px 0 0; border: 1px solid var(--line); border-radius: 6px; background: var(--soft); overflow: hidden; }
-    .ts canvas { display: block; width: 100%; }
-    #ts-series { height: 190px; }
-    #ts-acf { height: 84px; border-top: 1px solid var(--line); }
-    .ts figcaption {
-      display: flex; justify-content: space-between; align-items: flex-start; gap: 12px 20px; flex-wrap: wrap;
-      padding: 10px 14px; border-top: 1px solid var(--line); background: var(--bg);
-      font-family: var(--mono); font-size: 0.72rem; line-height: 1.7; color: var(--muted);
+    /* Decorative GARCH path: a new simulation on each page opening. */
+    .garch-background {
+      position: fixed; inset: 0; z-index: -1;
+      pointer-events: none; overflow: hidden;
+      opacity: 0.25;
     }
-    .ts figcaption p { margin: 0; flex: 1 1 320px; }
-    .ts .key-y { color: var(--accent); }
-    .ts .key-v { color: var(--vol); }
-    .ts button {
-      font: inherit; color: var(--text); background: transparent; cursor: pointer;
-      border: 1px solid var(--line); border-radius: 4px; padding: 3px 10px; white-space: nowrap;
+    .garch-background canvas { display: block; width: 100%; height: 100%; }
+    main.wrap { position: relative; background: var(--bg); background: color-mix(in srgb, var(--bg) 91%, transparent); }
+    .garch-control {
+      margin-top: 14px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      font-family: var(--mono); font-size: 0.68rem;
     }
-    .ts button:hover { border-color: var(--accent); color: var(--accent); }
+    .garch-control button {
+      font: inherit; padding: 3px 8px; border: 1px solid var(--line);
+      border-radius: 4px; background: var(--bg); color: var(--muted); cursor: pointer;
+    }
+    .garch-control button:hover { color: var(--accent); border-color: var(--accent); }
+    @media (max-width: 600px) {
+      header { gap: 24px; padding-top: 36px; }
+      header img { width: 170px; height: 170px; }
+      header > div { flex-basis: 100%; }
+      h1 { font-size: 2.1rem; }
+    }
 
     /* ---------- Sections ---------- */
     h2 { font-size: 1.4rem; margin: 52px 0 14px; }
@@ -145,6 +153,9 @@
   </style>
 </head>
 <body>
+  <div class="garch-background" aria-hidden="true">
+    <canvas id="ts-series"></canvas>
+  </div>
 
   <nav>
     <div class="wrap">
@@ -167,6 +178,7 @@
       <div>
         <h1>Filippo Nardoni</h1>
         <p class="role">PhD Student in Economics · Aarhus University, ACE</p>
+        <p class="location">Based in Aarhus, Denmark</p>
         <div class="links">
           <a href="mailto:filippo.nardoni@econ.au.dk">Email</a>
           <a href="cv.pdf">CV</a>
@@ -175,29 +187,13 @@
       </div>
     </header>
 
-    <!-- A fresh GARCH(1,1) path is simulated on every visit.
-         Change the parameters at the top of the first <script> below. -->
-    <figure class="ts">
-      <canvas id="ts-series" role="img" aria-label="A simulated GARCH(1,1) return series with its conditional volatility band"></canvas>
-      <canvas id="ts-acf" role="img" aria-label="Sample autocorrelation function of the squared series"></canvas>
-      <figcaption>
-        <p>
-          Simulated GARCH(1,1):
-          <span class="key-y">y<sub>t</sub></span> = σ<sub>t</sub>z<sub>t</sub>,
-          σ<sub>t</sub><sup>2</sup> = ω + αy<sub>t−1</sub><sup>2</sup> + βσ<sub>t−1</sub><sup>2</sup>,
-          <span id="ts-params"></span>.
-          Band: <span class="key-v">±2σ<sub>t</sub></span>.
-          Below: sample ACF of y<sub>t</sub><sup>2</sup>, dashed ±1.96/√T.
-        </p>
-        <button type="button" id="ts-redraw">Draw a new path</button>
-      </figcaption>
-    </figure>
-
     <section id="about">
       <h2>About</h2>
       <p>
-        I am a PhD student at Aarhus University, ACE (Aarhus Center for Econometrics).
-        My research is in financial econometrics, machine learning and bootstrap methods.
+        I am a PhD student in Economics at Aarhus University and part of ACE
+        (Aarhus Center for Econometrics), based in Aarhus, Denmark.
+        My research interests include financial econometrics, time series, machine learning
+        and bootstrap methods.
       </p>
       <ul class="tags">
         <li>Bootstrap</li>
@@ -270,160 +266,115 @@
       </p>
     </section>
 
-    <footer>© 2026 Filippo Nardoni</footer>
+    <footer>
+      © 2026 Filippo Nardoni · Aarhus, Denmark
+      <div class="garch-control">
+        <span>Background: simulated GARCH(1,1)</span>
+        <button type="button" id="ts-redraw">Draw a new path</button>
+      </div>
+    </footer>
   </main>
 
   <script>
-    /* ---------- Simulated GARCH(1,1) path and ACF of squares ---------- */
+    /* ---------- Decorative GARCH(1,1), refreshed on every opening ---------- */
     (function () {
-      var OMEGA = 0.05, ALPHA = 0.10, BETA = 0.85;   // need ALPHA + BETA < 1
-      var T = 400, BURN = 200, LAGS = 20;
+      'use strict';
+      var OMEGA = 0.05, ALPHA = 0.10, BETA = 0.85;
+      var T = 500, BURN = 300;
+      var canvas = document.getElementById('ts-series');
+      if (!canvas || !canvas.getContext) return;
+      var g = canvas.getContext('2d');
+      if (!g) return;
+      var y = [], sig = [], top = 1, shown = T, frame = null;
+      var width = 0, height = 0;
+      var motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+      var theme = window.matchMedia('(prefers-color-scheme: dark)');
+      var colors;
 
-      var cs = document.getElementById('ts-series');
-      var ca = document.getElementById('ts-acf');
-      if (!cs || !cs.getContext) return;
-      document.getElementById('ts-params').textContent =
-        '(ω, α, β) = (' + OMEGA.toFixed(2) + ', ' + ALPHA.toFixed(2) + ', ' + BETA.toFixed(2) + '), T = ' + T;
-
-      var y, sig, rho, shown = T, raf = null;
-      var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-      function randn() {                      // Box–Muller
-        var u = 0, v = 0;
+      function palette() {
+        var style = getComputedStyle(document.documentElement);
+        colors = { line: style.getPropertyValue('--accent').trim(),
+                   band: style.getPropertyValue('--vol').trim() };
+      }
+      function normal() {
+        var u = 0;
         while (!u) u = Math.random();
-        while (!v) v = Math.random();
-        return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+        return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * Math.random());
       }
-
       function simulate() {
-        y = []; sig = [];
-        var s2 = OMEGA / (1 - ALPHA - BETA), prev = 0;   // start at unconditional variance
+        y = []; sig = []; top = 1;
+        var variance = OMEGA / (1 - ALPHA - BETA), previous = 0;
         for (var t = 0; t < BURN + T; t++) {
-          s2 = OMEGA + ALPHA * prev * prev + BETA * s2;
-          var s = Math.sqrt(s2);
-          prev = s * randn();
-          if (t >= BURN) { y.push(prev); sig.push(s); }
+          variance = OMEGA + ALPHA * previous * previous + BETA * variance;
+          var sigma = Math.sqrt(variance);
+          previous = sigma * normal();
+          if (t >= BURN) {
+            y.push(previous); sig.push(sigma);
+            top = Math.max(top, Math.abs(previous), 2 * sigma);
+          }
         }
-        // sample ACF of y^2
-        var q = y.map(function (v) { return v * v; });
-        var m = q.reduce(function (a, b) { return a + b; }, 0) / T, g0 = 0, k, i;
-        for (i = 0; i < T; i++) g0 += (q[i] - m) * (q[i] - m);
-        rho = [];
-        for (k = 1; k <= LAGS; k++) {
-          var g = 0;
-          for (i = k; i < T; i++) g += (q[i] - m) * (q[i - k] - m);
-          rho.push(g / g0);
-        }
+        top *= 1.15;
       }
-
-      function css(name) {
-        return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-      }
-
-      function prep(c) {
-        var dpr = window.devicePixelRatio || 1, w = c.clientWidth, h = c.clientHeight;
-        c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
-        var g = c.getContext('2d');
+      function resize() {
+        var dpr = Math.min(window.devicePixelRatio || 1, 2);
+        width = canvas.clientWidth; height = canvas.clientHeight;
+        canvas.width = Math.round(width * dpr); canvas.height = Math.round(height * dpr);
         g.setTransform(dpr, 0, 0, dpr, 0, 0);
-        g.clearRect(0, 0, w, h);
-        g.font = '10px ' + css('--mono');
-        return { g: g, w: w, h: h };
+        draw();
       }
-
-      function drawSeries(n) {
-        var p = prep(cs), g = p.g, w = p.w, h = p.h, padX = 14, padY = 12, i;
-        var top = 0;
-        for (i = 0; i < T; i++) top = Math.max(top, Math.abs(y[i]), 2 * sig[i]);
-        top *= 1.08;
-        function X(t) { return padX + (w - 2 * padX) * t / (T - 1); }
-        function Y(v) { return h / 2 - (h / 2 - padY) * v / top; }
-
-        // grid
-        g.strokeStyle = css('--grid'); g.lineWidth = 1;
-        for (i = 0; i <= 8; i++) {
-          var gx = Math.round(X(i * (T - 1) / 8)) + 0.5;
-          g.beginPath(); g.moveTo(gx, 0); g.lineTo(gx, h); g.stroke();
-        }
-        g.strokeStyle = css('--line');
-        g.beginPath(); g.moveTo(0, Math.round(h / 2) + 0.5); g.lineTo(w, Math.round(h / 2) + 0.5); g.stroke();
-
-        // +/- 2 sigma band
+      function draw() {
+        g.clearRect(0, 0, width, height);
+        if (!y.length) return;
+        var middle = height * 0.48, amplitude = height * 0.39;
+        function X(i) { return width * i / (T - 1); }
+        function Y(value) { return middle - amplitude * value / top; }
+        var n = Math.min(T, shown), i;
         g.beginPath();
-        for (i = 0; i < n; i++) g.lineTo(X(i), Y(2 * sig[i]));
+        g.moveTo(X(0), Y(2 * sig[0]));
+        for (i = 1; i < n; i++) g.lineTo(X(i), Y(2 * sig[i]));
         for (i = n - 1; i >= 0; i--) g.lineTo(X(i), Y(-2 * sig[i]));
         g.closePath();
-        g.globalAlpha = 0.13; g.fillStyle = css('--vol'); g.fill(); g.globalAlpha = 1;
-        g.strokeStyle = css('--vol'); g.lineWidth = 1; g.globalAlpha = 0.7;
-        [1, -1].forEach(function (s) {
-          g.beginPath();
-          for (i = 0; i < n; i++) g.lineTo(X(i), Y(s * 2 * sig[i]));
+        g.fillStyle = colors.band; g.globalAlpha = 0.16; g.fill();
+        g.strokeStyle = colors.band; g.lineWidth = 1; g.globalAlpha = 0.55;
+        [1, -1].forEach(function (sign) {
+          g.beginPath(); g.moveTo(X(0), Y(sign * 2 * sig[0]));
+          for (i = 1; i < n; i++) g.lineTo(X(i), Y(sign * 2 * sig[i]));
           g.stroke();
         });
-        g.globalAlpha = 1;
-
-        // series
-        g.strokeStyle = css('--accent'); g.lineWidth = 1.1; g.lineJoin = 'round';
-        g.beginPath();
-        for (i = 0; i < n; i++) g.lineTo(X(i), Y(y[i]));
-        g.stroke();
-
-        g.fillStyle = css('--muted');
-        g.textAlign = 'right'; g.fillText('t = ' + T, w - 8, h - 7);
-        g.textAlign = 'left';  g.fillText('y_t', 8, 14);
+        g.globalAlpha = 0.85; g.strokeStyle = colors.line;
+        g.lineWidth = 1.2; g.lineJoin = 'round';
+        g.beginPath(); g.moveTo(X(0), Y(y[0]));
+        for (i = 1; i < n; i++) g.lineTo(X(i), Y(y[i]));
+        g.stroke(); g.globalAlpha = 1;
       }
-
-      function drawAcf() {
-        var p = prep(ca), g = p.g, w = p.w, h = p.h, padX = 14, k;
-        var band = 1.96 / Math.sqrt(T);
-        var hi = Math.max(0.3, Math.max.apply(null, rho)) * 1.15;
-        var lo = Math.min(-band * 1.6, Math.min.apply(null, rho) * 1.15);
-        function Y(v) { return 8 + (h - 16) * (hi - v) / (hi - lo); }
-        function X(lag) { return padX + 34 + (w - 2 * padX - 50) * (lag - 1) / (LAGS - 1); }
-
-        g.strokeStyle = css('--line'); g.lineWidth = 1;
-        g.beginPath(); g.moveTo(0, Math.round(Y(0)) + 0.5); g.lineTo(w, Math.round(Y(0)) + 0.5); g.stroke();
-
-        g.setLineDash([4, 4]); g.strokeStyle = css('--muted'); g.globalAlpha = 0.6;
-        [band, -band].forEach(function (b) {
-          g.beginPath(); g.moveTo(padX + 26, Y(b)); g.lineTo(w - padX, Y(b)); g.stroke();
-        });
-        g.setLineDash([]); g.globalAlpha = 1;
-
-        g.strokeStyle = css('--accent'); g.fillStyle = css('--accent'); g.lineWidth = 2;
-        for (k = 1; k <= LAGS; k++) {
-          g.beginPath(); g.moveTo(X(k), Y(0)); g.lineTo(X(k), Y(rho[k - 1])); g.stroke();
-          g.beginPath(); g.arc(X(k), Y(rho[k - 1]), 2.2, 0, 2 * Math.PI); g.fill();
-        }
-
-        g.fillStyle = css('--muted');
-        g.textAlign = 'left';  g.fillText('ACF', 8, 14);
-        g.textAlign = 'right'; g.fillText('lag ' + LAGS, w - 8, h - 7);
-      }
-
-      function render() { drawSeries(shown); drawAcf(); }
-
       function run() {
-        if (raf) cancelAnimationFrame(raf);
+        if (frame !== null) cancelAnimationFrame(frame);
+        frame = null;
         simulate();
-        if (still) { shown = T; render(); return; }
-        var start = null, dur = 1400;
-        (function step(ts) {
-          if (start === null) start = ts || performance.now();
-          var f = Math.min(1, ((ts || start) - start) / dur);
-          shown = Math.max(2, Math.round(T * (1 - Math.pow(1 - f, 3))));
-          render();
-          raf = f < 1 ? requestAnimationFrame(step) : null;
-        })();
+        if (motion.matches) { shown = T; draw(); return; }
+        shown = 2; draw();
+        var start = null;
+        function step(time) {
+          if (start === null) start = time;
+          var progress = Math.min(1, (time - start) / 2000);
+          shown = Math.max(2, Math.round(T * progress));
+          draw();
+          frame = progress < 1 ? requestAnimationFrame(step) : null;
+        }
+        frame = requestAnimationFrame(step);
       }
-
       document.getElementById('ts-redraw').addEventListener('click', run);
-      window.addEventListener('resize', render);
-      if (window.matchMedia) {
-        var mq = window.matchMedia('(prefers-color-scheme: dark)');
-        if (mq.addEventListener) mq.addEventListener('change', render);
-      }
-      if (document.fonts && document.fonts.ready) document.fonts.ready.then(render);
-      run();
+      window.addEventListener('resize', resize);
+      // Also regenerate when restored by browser Back/Forward navigation.
+      window.addEventListener('pageshow', function (event) { if (event.persisted) run(); });
+      theme.addEventListener('change', function () { palette(); draw(); });
+      motion.addEventListener('change', function () {
+        if (motion.matches) {
+          if (frame !== null) cancelAnimationFrame(frame);
+          frame = null; shown = T; draw();
+        }
+      });
+      palette(); resize(); run();
     })();
 
     /* ---------- Notes: root PDFs and PDFs inside notes/ ---------- */
